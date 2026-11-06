@@ -7,3 +7,9 @@ artifacts/*.json
 
 
 upload/
+
+# GitHub Actions self-hosted runner files and runtime state
+actions-runner/
+_work/
+.runner
+.credentials*
