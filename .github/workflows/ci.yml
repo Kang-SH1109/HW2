@@ -218,8 +218,8 @@ jobs:
         run: |
           New-Item monitoring\stop -ItemType File -Force | Out-Null
           if (Test-Path monitoring\monitor.pid) {
-            $pid = [int](Get-Content monitoring\monitor.pid)
-            Wait-Process -Id $pid -Timeout 15 -ErrorAction SilentlyContinue
+            $monitorPid = [int](Get-Content monitoring\monitor.pid)
+            Wait-Process -Id $monitorPid -Timeout 15 -ErrorAction SilentlyContinue
           }
           powershell -NoProfile -ExecutionPolicy Bypass -File .github\scripts\summarize_monitoring.ps1 -LogPath monitoring\api_requests.jsonl -OutputDirectory monitoring
 
