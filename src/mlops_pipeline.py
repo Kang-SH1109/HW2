@@ -18,6 +18,9 @@ from .config import ARTIFACTS, ML_DATA_DIR, MODEL_PATH, MODEL_VERSION, PUBLIC_DA
 
 SOURCE_URL = f"https://huggingface.co/datasets/{PUBLIC_DATASET}/resolve/{PUBLIC_DATASET_COMMIT}/smishing.csv"
 RANDOM_SEED = 20261106
+PER_CLASS = 500
+TUNING_ROWS = 300
+EVALUATION_ROWS = 700
 
 
 def normalize_text(text):
@@ -48,17 +51,18 @@ def prepare_data():
     rng = random.Random(RANDOM_SEED); rng.shuffle(candidates)
     by_label = {"normal": [], "spam": []}
     for label, text in candidates:
-        if len(by_label[label]) < 50: by_label[label].append((label, text))
-    if any(len(rows) < 50 for rows in by_label.values()):
-        raise RuntimeError("공개 데이터에서 두 라벨 각각 50건을 확보하지 못했습니다.")
+        if len(by_label[label]) < PER_CLASS: by_label[label].append((label, text))
+    if any(len(rows) < PER_CLASS for rows in by_label.values()):
+        raise RuntimeError(f"공개 데이터에서 라벨별 {PER_CLASS}건을 확보하지 못했습니다.")
     selected = by_label["normal"] + by_label["spam"]; rng.shuffle(selected)
-    tuning, evaluation = selected[:30], selected[30:100]
+    tuning, evaluation = selected[:TUNING_ROWS], selected[TUNING_ROWS:TUNING_ROWS + EVALUATION_ROWS]
     for path, rows in ((ML_DATA_DIR / "tuning.csv", tuning), (ML_DATA_DIR / "evaluation.csv", evaluation)):
         with path.open("w", encoding="utf-8", newline="") as stream:
             writer = csv.writer(stream); writer.writerow(["label", "text"]); writer.writerows(rows)
     metadata = {"dataset": PUBLIC_DATASET, "commit": PUBLIC_DATASET_COMMIT, "source_url": SOURCE_URL,
-                "license": "CC BY-NC-SA 4.0", "selection_seed": RANDOM_SEED, "selected_rows": 100,
-                "tuning_rows": 30, "evaluation_rows": 70, "tuning_isolated_from_evaluation": True,
+                "license": "CC BY-NC-SA 4.0", "selection_seed": RANDOM_SEED, "selected_rows": PER_CLASS * 2,
+                "class_counts": {"normal": PER_CLASS, "spam": PER_CLASS}, "tuning_rows": TUNING_ROWS,
+                "evaluation_rows": EVALUATION_ROWS, "tuning_isolated_from_evaluation": True,
                 "preprocessing": "Unicode NFKC, lower-case, URL/email/phone redaction, whitespace normalization",
                 "deduplicated_rows": len(candidates), "created_at_utc": datetime.now(timezone.utc).isoformat()}
     (ML_DATA_DIR / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -2,7 +2,7 @@
 
 ## Pipeline
 
-`python -m src.mlops_pipeline` downloads the pinned public CSV, removes duplicate normalized messages, redacts URL/e-mail/phone patterns, and creates exactly 30 tuning and 70 final-evaluation rows under `mlops_data/`. Candidate choice uses only 3-fold F1 on the tuning set. The 70-row evaluation set is read only once after selection.
+`python -m src.mlops_pipeline` downloads the pinned public CSV, removes duplicate normalized messages, redacts URL/e-mail/phone patterns, and creates exactly 300 tuning and 700 final-evaluation rows under `mlops_data/`. Candidate choice uses only 3-fold F1 on the tuning set. The 700-row evaluation set is read only once after selection.
 
 Two candidate attempts are limited to:
 

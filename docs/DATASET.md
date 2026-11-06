@@ -12,10 +12,10 @@ The pipeline maps these labels to `normal` and `spam`. The source is downloaded 
 
 ## Selection and privacy checks
 
-The pipeline uses a fixed seed (`20261106`), removes duplicate normalized messages, and selects 50 messages per class. It redacts URLs, e-mail addresses, and phone-number patterns before writing the derived data. The selected 100 records are split once into:
+The pipeline uses a fixed seed (`20261106`), removes duplicate normalized messages, and selects 500 messages per class. It redacts URLs, e-mail addresses, and phone-number patterns before writing the derived data. The selected 1,000 records are split once into:
 
-- 30 tuning records (15 normal, 15 spam)
-- 70 final evaluation records (35 normal, 35 spam)
+- 300 tuning records (150 normal, 150 spam)
+- 700 final evaluation records (350 normal, 350 spam)
 
 The evaluation file is generated under `mlops_data/` and is ignored by Git. It is never read during candidate selection or parameter tuning. The final evaluation is run once after the candidate is selected by 3-fold F1 cross-validation on the 30 tuning records.
 
