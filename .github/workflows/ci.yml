@@ -111,11 +111,16 @@ jobs:
       - name: Start independent API monitor
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
-          $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/health' -TimeoutSec 5
-          if ($health.status -ne 'ok' -or $health.model_loaded -ne $true) { throw 'Existing service is not healthy before deployment.' }
-          $body = @{text='배포 전 기존 서비스 확인 문자'} | ConvertTo-Json -Compress
-          $probe = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/api/predict' -ContentType 'application/json' -Body $body -TimeoutSec 5
-          if (-not $probe.model_version) { throw 'Existing service prediction did not return a model version.' }
+          $existing = docker ps -aq --filter 'name=^ai-spam-detector$'
+          if ($existing) {
+            $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/health' -TimeoutSec 5
+            if ($health.status -ne 'ok' -or $health.model_loaded -ne $true) { throw 'Existing service is not healthy before deployment.' }
+            $body = @{text='deployment preflight check'} | ConvertTo-Json -Compress
+            $probe = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/api/predict' -ContentType 'application/json' -Body $body -TimeoutSec 5
+            if (-not $probe.model_version) { throw 'Existing service prediction did not return a model version.' }
+          } else {
+            Write-Host 'No existing ai-spam-detector container found; proceeding with initial deployment.'
+          }
           New-Item -ItemType Directory -Force monitoring | Out-Null
           Remove-Item monitoring\* -Force -ErrorAction SilentlyContinue
           Set-Content -Path monitoring\phase.txt -Value 'pre' -Encoding UTF8
