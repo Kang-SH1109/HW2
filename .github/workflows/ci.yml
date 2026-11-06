@@ -106,7 +106,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull and replace local container
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         env:
           IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
           CONTAINER_NAME: ai-spam-detector
@@ -170,5 +170,5 @@ jobs:
           }
 
       - name: Show deployed container
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: docker ps --filter "name=^ai-spam-detector$"
