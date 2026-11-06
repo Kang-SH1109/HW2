@@ -106,7 +106,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull and replace local container
-        shell: pwsh
+        shell: powershell
         env:
           IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
           CONTAINER_NAME: ai-spam-detector
@@ -114,7 +114,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $shortSha = $env:GITHUB_SHA.Substring(0, 7)
-          $image = "$($env:IMAGE_REPOSITORY):sha-$shortSha"
+          $image = '{0}:sha-{1}' -f $env:IMAGE_REPOSITORY, $shortSha
 
           docker pull $image
           if ($LASTEXITCODE -ne 0) { throw 'Docker image pull failed.' }
@@ -170,5 +170,5 @@ jobs:
           }
 
       - name: Show deployed container
-        shell: pwsh
+        shell: powershell
         run: docker ps --filter "name=^ai-spam-detector$"
