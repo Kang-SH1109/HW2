@@ -14,8 +14,8 @@ COPY src ./src
 COPY data ./data
 COPY web ./web
 
-# Build-time model preparation. The generated artifacts remain inside the image.
-RUN python -m src.train
+# Build-time public-data selection, comparison, and model preparation.
+RUN python -m src.mlops_pipeline
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

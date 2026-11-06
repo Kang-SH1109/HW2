@@ -30,7 +30,7 @@ jobs:
 
       - name: Train model and run tests
         run: |
-          python -m src.train
+          python -m src.mlops_pipeline
           python -m pytest -q
 
       - name: Log in to Docker Hub
@@ -99,11 +99,37 @@ jobs:
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 10
     steps:
+      - name: Check out source and monitoring scripts
+        uses: actions/checkout@v4
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Start independent API monitor
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
+        run: |
+          $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/health' -TimeoutSec 5
+          if ($health.status -ne 'ok' -or $health.model_loaded -ne $true) { throw 'Existing service is not healthy before deployment.' }
+          $body = @{text='배포 전 기존 서비스 확인 문자'} | ConvertTo-Json -Compress
+          $probe = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/api/predict' -ContentType 'application/json' -Body $body -TimeoutSec 5
+          if (-not $probe.model_version) { throw 'Existing service prediction did not return a model version.' }
+          New-Item -ItemType Directory -Force monitoring | Out-Null
+          Remove-Item monitoring\* -Force -ErrorAction SilentlyContinue
+          Set-Content -Path monitoring\phase.txt -Value 'pre' -Encoding UTF8
+          $monitorScript = Join-Path $PWD '.github\scripts\monitor_deployment.ps1'
+          $monitorLog = Join-Path $PWD 'monitoring\api_requests.jsonl'
+          $monitorPhase = Join-Path $PWD 'monitoring\phase.txt'
+          $monitorStop = Join-Path $PWD 'monitoring\stop'
+          $monitor = Start-Process -FilePath powershell.exe -PassThru -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $monitorScript),
+            '-BaseUrl', 'http://127.0.0.1:8000', '-LogPath', ('"{0}"' -f $monitorLog),
+            '-PhasePath', ('"{0}"' -f $monitorPhase), '-StopPath', ('"{0}"' -f $monitorStop)
+          )
+          Set-Content monitoring\monitor.pid $monitor.Id
+          Start-Sleep -Seconds 5
 
       - name: Pull and replace local container
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
@@ -113,6 +139,7 @@ jobs:
           BACKUP_NAME: ai-spam-detector-previous
         run: |
           $ErrorActionPreference = 'Stop'
+          Set-Content -Path monitoring\phase.txt -Value 'deploying' -Encoding UTF8
           $shortSha = $env:GITHUB_SHA.Substring(0, 7)
           $image = '{0}:sha-{1}' -f $env:IMAGE_REPOSITORY, $shortSha
 
@@ -172,3 +199,38 @@ jobs:
       - name: Show deployed container
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: docker ps --filter "name=^ai-spam-detector$"
+
+      - name: Monitor post-deployment service for 30 seconds
+        if: success()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
+        run: |
+          Set-Content -Path monitoring\phase.txt -Value 'post' -Encoding UTF8
+          Start-Sleep -Seconds 30
+
+      - name: Stop monitor and create summary
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
+        run: |
+          New-Item monitoring\stop -ItemType File -Force | Out-Null
+          if (Test-Path monitoring\monitor.pid) {
+            $pid = [int](Get-Content monitoring\monitor.pid)
+            Wait-Process -Id $pid -Timeout 15 -ErrorAction SilentlyContinue
+          }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .github\scripts\summarize_monitoring.ps1 -LogPath monitoring\api_requests.jsonl -OutputDirectory monitoring
+
+      - name: Publish monitoring summary
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
+        run: |
+          if (Test-Path monitoring\summary.md) { Get-Content monitoring\summary.md | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding UTF8 }
+
+      - name: Upload deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spam-detector-deployment-${{ github.run_id }}
+          path: |
+            monitoring/
+            artifacts/model_comparison.json
+            artifacts/model_metadata.json
+          if-no-files-found: warn

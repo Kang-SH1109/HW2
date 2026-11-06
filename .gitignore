@@ -13,3 +13,5 @@ actions-runner/
 _work/
 .runner
 .credentials*
+mlops_data/
+monitoring/
